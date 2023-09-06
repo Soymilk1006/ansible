@@ -1,0 +1,65 @@
+---
+- name: Log in as root and set up enviorment
+  hosts: aws_ec2 # Replace with the appropriate group or hostname
+  gather_facts: no # Disable gathering facts, as we're logging in as root
+  become: yes # Enable privilege escalation
+  vars_files:
+    - project-vars
+  tasks:
+    - name: Execute a command as root
+      command: whoami # Replace with the command you want to run
+      register: result
+
+    - name: Display the command output
+      debug:
+        var: result.stdout
+
+    - name: update Yum repo and cache
+      yum: update_cache=yes
+    - name: Install node and npm
+      yum:
+        name:
+          - nodejs
+          - npm
+        state: present
+    - name: Create new linux user for node app
+      user:
+        name: "{{new_user}}"
+        comment: Set up ansible_user as a Admin user
+        group: adm
+
+- name: Deploy nodejs app
+  hosts: aws_ec2
+  gather_facts: no
+  become: yes
+  become_user: "{{new_user}}"
+  vars_files:
+    - project-vars
+
+  tasks:
+    - name: Create a directory to store the nodejs app
+      file:
+        path: "{{home_directory}}/node-app"
+        state: directory
+
+    - name: Copy and unpack the nodejs folder to a server
+      unarchive:
+        src: /home/ec2-user/ansible/Ansible_nodejs/node-app/my-app.tar.gz
+        dest: "{{home_directory}}/node-app"
+    - name: Install dependencies
+      npm:
+        path: "{{home_directory}}/node-app/my-app"
+    - name: Start the application
+      command:
+        chdir: "{{home_directory}}/node-app/my-app"
+        cmd: npm start
+      async: 1000
+      poll: 0
+    - name: Pause playbook execution for 10 seconds
+      pause:
+        seconds: 10
+    - name: Ensure app is running
+      shell: ps aux | grep node
+      register: app_status
+    - name: Print out app status
+      debug: msg={{app_status.stdout_lines}}
