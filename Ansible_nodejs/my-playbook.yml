@@ -16,11 +16,11 @@
 
     - name: update Yum repo and cache
       yum: update_cache=yes
-    - name: Install node and npm
+    - name: Install docker
       yum:
         name:
-          - nodejs
-          - npm
+          - python3
+          - docker
         state: present
     - name: Create new linux user for node app
       user:
